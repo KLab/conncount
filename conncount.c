@@ -110,7 +110,7 @@ int main(int argc, char *argv[])
     usage();
   }
   p = atoi(argv[1]);
-  if(p == 0){
+  if(p <= 0 || p > 65535){
     usage();
   }
 
