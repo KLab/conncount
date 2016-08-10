@@ -29,3 +29,12 @@ $ conncount -e 80
 $ conncount -estcf 80
 ```
 
+```
+usage: conncount [OPTION] port
+  -l, --listen
+  -e, --established
+  -t, --time-wait
+  -c, --close
+  -f, --fin
+  -s, --syn
+```
