@@ -6,7 +6,7 @@ netstat | grep xx | wc -l の代替で使えます
 
 ```
 $ make
-$ cp conncount ~/bin/
+$ cp ./conncount ~/bin/
 ```
 
 ## 使い方
