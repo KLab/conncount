@@ -25,11 +25,17 @@ enum {
 
 void usage()
 {
-  printf("usage: conncount port\n");
+  printf("usage: conncount [OPTION] port\n");
+  printf("  -l, --listen\n");
+  printf("  -e, --established\n");
+  printf("  -t, --time-wait\n");
+  printf("  -c, --close\n");
+  printf("  -f, --fin\n");
+  printf("  -s, --syn\n");
   exit(0);
 }
 
-int scount(int n, int p)
+int scount(int n, int p, int s)
 {
   int r=0;
   int len;
@@ -50,7 +56,7 @@ int scount(int n, int p)
   wbuf.req.idiag_src_len      = 0;
   wbuf.req.idiag_dst_len      = 0;
   wbuf.req.idiag_ext          = 0; 
-  wbuf.req.idiag_states       = TCPF_ESTABLISHED;
+  wbuf.req.idiag_states       = s;
   wbuf.req.idiag_dbs          = 0;
   wbuf.req.id.idiag_sport     = htons(p);
   wbuf.req.id.idiag_dport     = 0;
@@ -78,6 +84,9 @@ int scount(int n, int p)
       if(nlh->nlmsg_type == NLMSG_DONE){
         return(r);
       }
+      if(msg->idiag_family != AF_INET){
+        continue;
+      }
       r++;
     }
   }
@@ -90,14 +99,50 @@ int main(int argc, char *argv[])
   int c;
   int p;
   int n;
+  int s;
 
   struct option opt[]={
-    {"help",    0, NULL, 'h'},
+    {"help",        0, NULL, 'h'},
+    {"listen",      0, NULL, 'l'},
+    {"established", 0, NULL, 'e'},
+    {"timewait",    0, NULL, 't'},
+    {"close",       0, NULL, 'c'},
+    {"fin",         0, NULL, 'f'},
+    {"syn",         0, NULL, 's'},
     {0, 0, 0, 0}
   };
 
-  while((r=getopt_long(argc, argv, "h", opt, NULL)) != -1){
+  s = 0;
+  while((r=getopt_long(argc, argv, "hletcfs", opt, NULL)) != -1){
     switch(r){
+      case 'e':
+        s |= TCPF_ESTABLISHED;
+        break;
+
+      case 'l':
+        s |= TCPF_LISTEN;
+        break;
+
+      case 't':
+        s |= TCPF_TIME_WAIT;
+        break;
+
+      case 'c':
+        s |= TCPF_CLOSE;
+        s |= TCPF_CLOSE_WAIT;
+        s |= TCPF_CLOSING;
+        break;
+
+      case 'f':
+        s |= TCPF_FIN_WAIT1;
+        s |= TCPF_FIN_WAIT2;
+        break;
+
+      case 's':
+        s |= TCPF_SYN_SENT;
+        s |= TCPF_SYN_RECV;
+        break;
+
       case 'h':
         usage();
 
@@ -106,10 +151,10 @@ int main(int argc, char *argv[])
     }
   }
 
-  if(argc != 2){
+  if(optind == argc){
     usage();
   }
-  p = atoi(argv[1]);
+  p = atoi(argv[optind]);
   if(p <= 0 || p > 65535){
     usage();
   }
@@ -119,7 +164,10 @@ int main(int argc, char *argv[])
     fprintf(stderr, "Can't Open NetLink!!\n");
     return(1);
   }
-  c = scount(n, p);
+  if(s == 0){
+    s = 0xFFF;
+  }
+  c = scount(n, p, s);
   if(c != -1){
     printf("%d\n", c);
   }else{
