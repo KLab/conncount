@@ -1,6 +1,9 @@
 # conncount
 
-netstat | grep xx | wc -l の代替で使えます
+netstat | grep xx | wc -l の代替で使えます。
+
+netlink経由で抽出しているので高速軽量です。
+
 
 ## インストール方法
 
