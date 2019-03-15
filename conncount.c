@@ -1,8 +1,10 @@
 #include<stdio.h>
 #include<stdlib.h>
 #include<unistd.h>
+#include<string.h>
 #include<getopt.h>
 #include<sys/socket.h>
+#include<netinet/tcp.h>
 #include<linux/netlink.h>
 #include<linux/inet_diag.h>
 
@@ -23,6 +25,38 @@ enum {
   TCPF_CLOSING     = (1 << 11)
 };
 
+static const char *tcp_state[] = {
+    "", /* 0 */
+    "ESTABLISHED",
+    "SYN_SENT",
+    "SYN_RECV",
+    "FIN_WAIT1",
+    "FIN_WAIT2",
+    "TIME_WAIT",
+    "CLOSED",
+    "CLOSE_WAIT",
+    "LAST_ACK",
+    "LISTEN",
+    "CLOSING"
+};
+
+static const int opt_state[] = {
+  0,
+  TCPF_ESTABLISHED,
+  TCPF_SYN_SENT,
+  TCPF_SYN_RECV,
+  TCPF_FIN_WAIT1,
+  TCPF_FIN_WAIT2,
+  TCPF_TIME_WAIT,
+  TCPF_CLOSE,
+  TCPF_CLOSE_WAIT,
+  TCPF_LAST_ACK,
+  TCPF_LISTEN,
+  TCPF_CLOSING
+};
+
+int count[sizeof tcp_state/sizeof tcp_state[0]];
+
 void usage()
 {
   printf("usage: conncount [OPTION] port\n");
@@ -32,7 +66,19 @@ void usage()
   printf("  -c, --close\n");
   printf("  -f, --fin\n");
   printf("  -s, --syn\n");
+  printf("  -v, --verbose\n");
   exit(0);
+}
+
+int showcount(int s)
+{
+  int i;
+
+  for (i = 1; i < sizeof count/sizeof count[0]; i++) {
+    if (s & opt_state[i]) {
+      printf("%s %d\n", tcp_state[i], count[i]);
+    }
+  }
 }
 
 int scount(int n, int p, int s)
@@ -48,6 +94,7 @@ int scount(int n, int p, int s)
   struct nlmsghdr       *nlh;
   struct inet_diag_msg  *msg;
 
+  memset(count, 0, sizeof count);
   wbuf.nlh.nlmsg_len          = NLMSG_ALIGN(NLMSG_LENGTH(sizeof(wbuf.req)));
   wbuf.nlh.nlmsg_type         = TCPDIAG_GETSOCK;
   wbuf.nlh.nlmsg_flags        = NLM_F_REQUEST | NLM_F_DUMP;
@@ -87,6 +134,7 @@ int scount(int n, int p, int s)
       if(msg->idiag_family != AF_INET){
         continue;
       }
+      count[msg->idiag_state]++;
       r++;
     }
   }
@@ -100,6 +148,7 @@ int main(int argc, char *argv[])
   int p;
   int n;
   int s;
+  int v;
 
   struct option opt[]={
     {"help",        0, NULL, 'h'},
@@ -109,11 +158,13 @@ int main(int argc, char *argv[])
     {"close",       0, NULL, 'c'},
     {"fin",         0, NULL, 'f'},
     {"syn",         0, NULL, 's'},
+    {"verbose",     0, NULL, 'v'},
     {0, 0, 0, 0}
   };
 
   s = 0;
-  while((r=getopt_long(argc, argv, "hletcfs", opt, NULL)) != -1){
+  v = 0;
+  while((r=getopt_long(argc, argv, "hletcfsv", opt, NULL)) != -1){
     switch(r){
       case 'e':
         s |= TCPF_ESTABLISHED;
@@ -143,6 +194,10 @@ int main(int argc, char *argv[])
         s |= TCPF_SYN_RECV;
         break;
 
+      case 'v':
+        v = 1;
+        break;
+
       case 'h':
         usage();
 
@@ -169,7 +224,11 @@ int main(int argc, char *argv[])
   }
   c = scount(n, p, s);
   if(c != -1){
-    printf("%d\n", c);
+    if (v) {
+      showcount(s);
+    } else {
+      printf("%d\n", c);
+    }
   }else{
     return(1);
   }
